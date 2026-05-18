@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>रेलवे रोबो Pro 🚂</title><link rel="manifest" id="pwaManifest">
+<meta name="theme-color" content="#f59e0b"><style>
+:root{
+  --bg:#060d1a;
+  --card:#0f172a;
+  --surface:#111827;
+  --text:#ffffff;
+  --muted:#94a3b8;
+  --accent:#f59e0b;
+  --green:#22c55e;
+  --blue:#38bdf8;
+  --border:#1e293b;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:sans-serif;
+  padding:14px;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:14px;
+}
+
+h1{
+  font-size:28px;
+  margin-bottom:8px;
+}
+
+button{
+  background:var(--accent);
+  border:none;
+  padding:10px 14px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:bold;
+  margin:4px;
+}
+
+input{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:white;
+  margin-top:10px;
+}
+
+#chat{
+  height:300px;
+  overflow:auto;
+  margin-top:10px;
+}
+
+.msg{
+  padding:10px;
+  border-radius:12px;
+  margin:8px 0;
+}
+
+.user{
+  background:#1d4ed8;
+}
+
+.bot{
+  background:#14532d;
+}
+
+iframe{
+  width:100%;
+  border:none;
+  border-radius:12px;
+  height:250px;
+}
+</style></head>
+<body><div class="card">
+  <h1>🤖 रेलवे रोबो Pro 🚂</h1>
+  <p>Indian Railway AI Assistant</p><button onclick="startVoice()">🎙️ Voice</button> <button onclick="toggleTheme()">🌙 Theme</button> <button onclick="shareApp()">📤 Share</button> <button onclick="installApp()">📲 Install</button>
+
+</div><div class="card" id="keyModal">
+  <h3>🔑 Gemini API Key</h3>
+  <input type="password" id="keyInput" placeholder="AIza...">
+  <button onclick="saveKey()">Save Key</button>
+</div><div class="card">
+  <h3>💬 AI Chat</h3>  <div id="chat"></div>  <input type="text" id="userInput" placeholder="सवाल पूछें..."><button onclick="sendMessage()">Send</button>
+
+</div><div class="card">
+  <h3>🚂 Train Info</h3>
+  <p>राजधानी एक्सप्रेस — समय पर</p>
+  <p>शताब्दी एक्सप्रेस — 25 मिनट लेट</p>
+  <p>दुरंतो एक्सप्रेस — समय पर</p>
+</div><div class="card">
+  <h3>🌦️ Weather</h3>
+  <p>नई दिल्ली: 34°C ⛅</p>
+</div><div class="card">
+  <h3>🗺️ Station Map</h3>  <iframe
+  loading="lazy"
+  allowfullscreen
+  src="https://www.google.com/maps?q=New+Delhi+Railway+Station&output=embed">
+  </iframe>
+</div><script>
+
+// API KEY SYSTEM
+let GEMINI_KEY = "";
+
+function loadSavedKey(){
+
+  const saved = localStorage.getItem('railway_robo_key');
+
+  if(saved){
+    GEMINI_KEY = saved;
+    document.getElementById('keyModal').style.display='none';
+  }
+}
+
+function saveKey(){
+
+  const key = document.getElementById('keyInput').value.trim();
+
+  if(!key.startsWith('AIza')){
+    alert('Valid Gemini API key daalo');
+    return;
+  }
+
+  localStorage.setItem('railway_robo_key', key);
+
+  GEMINI_KEY = key;
+
+  document.getElementById('keyModal').style.display='none';
+
+  alert('API key save ho gayi ✅');
+}
+
+// CHAT
+const chat = document.getElementById('chat');
+
+function addMsg(type,text){
+
+  const div = document.createElement('div');
+
+  div.className = 'msg ' + type;
+
+  div.innerHTML = text;
+
+  chat.appendChild(div);
+
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage(){
+
+  const input = document.getElementById('userInput');
+
+  const txt = input.value.trim();
+
+  if(!txt) return;
+
+  addMsg('user', txt);
+
+  input.value='';
+
+  try{
+
+    const r = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=' + GEMINI_KEY,
+      {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({
+          contents:[
+            {
+              parts:[
+                {
+                  text:'Hindi mein answer do: ' + txt
+                }
+              ]
+            }
+          ]
+        })
+      }
+    );
+
+    const data = await r.json();
+
+    let reply = 'Reply nahi mila 😅';
+
+    if(
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content
+    ){
+      reply = data.candidates[0].content.parts[0].text;
+    }
+
+    addMsg('bot', reply);
+
+    speakText(reply);
+
+  }catch(err){
+
+    addMsg('bot','⚠️ Network error');
+  }
+}
+
+// VOICE INPUT
+const SpeechRecognition =
+window.SpeechRecognition ||
+window.webkitSpeechRecognition;
+
+if(SpeechRecognition){
+
+  const recognition = new SpeechRecognition();
+
+  recognition.lang='hi-IN';
+
+  recognition.onresult = e => {
+
+    document.getElementById('userInput').value =
+      e.results[0][0].transcript;
+
+    sendMessage();
+  }
+
+  window.startVoice = ()=>{
+    recognition.start();
+  }
+}
+
+// VOICE OUTPUT
+function speakText(text){
+
+  const speech = new SpeechSynthesisUtterance(text);
+
+  speech.lang='hi-IN';
+
+  speechSynthesis.speak(speech);
+}
+
+// THEME
+function toggleTheme(){
+
+  if(document.body.style.background === 'white'){
+
+    document.body.style.background='#060d1a';
+    document.body.style.color='white';
+
+  }else{
+
+    document.body.style.background='white';
+    document.body.style.color='black';
+  }
+}
+
+// SHARE
+async function shareApp(){
+
+  if(navigator.share){
+
+    await navigator.share({
+      title:'रेलवे रोबो',
+      text:'Railway AI App 🚂',
+      url:location.href
+    });
+  }
+}
+
+// INSTALL
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', e => {
+
+  e.preventDefault();
+
+  deferredPrompt = e;
+});
+
+async function installApp(){
+
+  if(deferredPrompt){
+
+    deferredPrompt.prompt();
+  }
+}
+
+// PWA MANIFEST
+const manifest = {
+  name:'Railway Robo Pro',
+  short_name:'Railway Robo',
+  display:'standalone',
+  start_url:'./',
+  background_color:'#060d1a',
+  theme_color:'#f59e0b'
+};
+
+const blob = new Blob(
+  [JSON.stringify(manifest)],
+  {type:'application/json'}
+);
+
+const manifestURL = URL.createObjectURL(blob);
+
+document.getElementById('pwaManifest')
+  .setAttribute('href', manifestURL);
+
+// START
+window.onload = ()=>{
+
+  loadSavedKey();
+
+  addMsg('bot','नमस्ते! मैं रेलवे रोबो हूँ 🚂');
+}
+
+</script></body>
+</html>
